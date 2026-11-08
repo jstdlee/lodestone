@@ -9,43 +9,47 @@ permissions:
   contents: write
 
 jobs:
-  tag:
-    if: github.event_name == 'workflow_dispatch'
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
-      - name: Tag the version in mygo.json
+      - id: tag
+        name: Check the version
         run: |
           version=$(jq -r .version mygo.json)
-          tag="v$version"
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "tag $tag already exists; bump version in mygo.json" >&2
-            exit 1
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$version"
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$tag" -m "Lodestone $version"
-          git push origin "$tag"
-
-  draft-release:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Check the version
-        run: test "$GITHUB_REF_NAME" = "v$(jq -r .version mygo.json)"
+          test "$tag" = "v$version"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Tag the version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          tag="${{ steps.tag.outputs.tag }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "tag $tag already exists"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$tag" -m "Lodestone ${tag#v}"
+            git push origin "$tag"
+          fi
       - name: Create the draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-              --draft --verify-tag --title "Lodestone ${GITHUB_REF_NAME#v}" --generate-notes
+          tag="${{ steps.tag.outputs.tag }}"
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --draft --title "Lodestone ${tag#v}" --generate-notes
           fi
 
   build:
-    needs: draft-release
-    if: github.event_name == 'push'
+    needs: prepare
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -69,6 +73,7 @@ jobs:
       - name: Upload to the draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           shopt -s nullglob
           files=(build/*/*.dmg build/*/*-setup-*.exe build/*/*.deb build/*/*.tar.gz)
@@ -76,13 +81,13 @@ jobs:
             echo "no release files under build/" >&2
             exit 1
           fi
-          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
 
   publish:
-    needs: build
-    if: github.event_name == 'push'
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
       - env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false

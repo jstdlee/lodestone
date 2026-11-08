@@ -128,7 +128,7 @@ Hub repos are folders named `models--org--name` (or `datasets--`, `spaces--`). T
 
 ## Releases
 
-The version is `version` in `mygo.json`. Run the Release workflow from the Actions tab. It tags `v` plus that version, when the tag is missing, and that tag publishes the release. `v0.1.1` matches `"version": "0.1.1"`. Any other tag fails before it builds. Pushing the tag yourself publishes the same way.
+The version is `version` in `mygo.json`. Run the Release workflow from the Actions tab. It tags `v` plus that version, when the tag is missing, then builds and publishes the release. `v0.1.1` matches `"version": "0.1.1"`. Any other tag fails before it builds. Pushing the tag yourself publishes the same way.
 
 The release is four builds: macOS on Apple silicon (M series), Windows x64, Linux x64, and Linux ARM64. Each upload is the disk image, the installer, or the Debian package and archive for that machine.
 
