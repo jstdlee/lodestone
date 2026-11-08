@@ -2,5 +2,11 @@
   "name": "Lodestone",
   "identifier": "dev.lodestone.app",
   "version": "0.1.0",
-  "out": "build"
+  "out": "build",
+  "linux": {
+    "webview": false,
+    "comment": "Model caches, loose weights, and large files",
+    "categories": ["Utility"],
+    "command": "lodestone"
+  }
 }
