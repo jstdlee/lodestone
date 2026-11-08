@@ -20,7 +20,7 @@ The window opens on the map. Category totals sit above a treemap. Search, under 
 
 **Selection.** The chosen block shines and the others dim. The shine pulses down to a dim and back up, with no border. After the pulse it stays bright. Cards in the gallery use the same shine and dim.
 
-**Tips.** Rest the pointer on a map block, a gallery card, a list row, or a truncated detail (name, path, layout, environment, note) for 400ms. The tip shows the full file name and the full path. A button's own tip, such as Show in folder, wins while the pointer is on that button.
+**Tips.** Rest the pointer on a map block, a gallery card, a list row, or a truncated detail (name, path, layout, environment, note) for 400ms. The tip shows the full file name and the full path, and it stays beside the pointer as the pointer moves. Near the right or bottom edge it flips to the other side of the pointer so it stays in view. A button's own tip, such as Show in folder, wins while the pointer is on that button.
 
 Rescan, custom directories, and the theme are the icons at the right. The theme follows the system the first time the window opens, then the sun and moon icons switch it.
 

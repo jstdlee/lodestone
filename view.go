@@ -509,6 +509,10 @@ func placeTip(c *ui.Context, t *ui.Theme, anchor ui.Element, title, path string)
 		fill, ink = ui.Hex("#f4f5f7"), ui.Hex("#1d1d1f")
 	}
 	ui.TooltipBase(c, anchor, func(tip ui.Element) {
+		x, y, over := anchor.PointerPosition()
+		b := anchor.Bounds()
+		self, dx, dy := tipFollow(x, y, b.W, b.H, over)
+		tip.AttachTo(anchor, ui.AnchorTopLeft, self).Translate(dx, dy)
 		tip.MaxWidth(440).Padding(8, 10).Radius(8).Background(fill).TextColor(ink)
 		tip.Children(func() {
 			ui.Column(c).Gap(3).Children(func() {
@@ -521,6 +525,26 @@ func placeTip(c *ui.Context, t *ui.Theme, anchor ui.Element, title, path string)
 			})
 		})
 	})
+}
+
+// tipFollow puts the label's corner beside the pointer. self is that corner
+// of the label; dx and dy move it from the anchor's top left to the pointer.
+func tipFollow(x, y, w, h float32, over bool) (self ui.Anchor, dx, dy float32) {
+	if !over {
+		return ui.AnchorTopLeft, 12, 12
+	}
+	left := w > 0 && x > w-220
+	above := h > 0 && y > h-80
+	switch {
+	case left && above:
+		return ui.AnchorBottomRight, x - 14, y - 12
+	case left:
+		return ui.AnchorTopRight, x - 14, y + 16
+	case above:
+		return ui.AnchorBottomLeft, x + 14, y - 12
+	default:
+		return ui.AnchorTopLeft, x + 14, y + 16
+	}
 }
 
 func (a *app) listPane(c *ui.Context, t *ui.Theme) {

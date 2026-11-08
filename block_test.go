@@ -51,6 +51,25 @@ func TestTipTitleUsesFileName(t *testing.T) {
 	}
 }
 
+func TestTipFollowsPointer(t *testing.T) {
+	self, dx, dy := tipFollow(40, 30, 800, 500, true)
+	if self != ui.AnchorTopLeft || dx != 54 || dy != 46 {
+		t.Fatalf("below right: %v %v %v", self, dx, dy)
+	}
+	self, dx, dy = tipFollow(700, 30, 800, 500, true)
+	if self != ui.AnchorTopRight || dx != 686 || dy != 46 {
+		t.Fatalf("below left: %v %v %v", self, dx, dy)
+	}
+	self, dx, dy = tipFollow(40, 460, 800, 500, true)
+	if self != ui.AnchorBottomLeft || dx != 54 || dy != 448 {
+		t.Fatalf("above right: %v %v %v", self, dx, dy)
+	}
+	self, dx, dy = tipFollow(700, 460, 800, 500, true)
+	if self != ui.AnchorBottomRight || dx != 686 || dy != 448 {
+		t.Fatalf("above left: %v %v %v", self, dx, dy)
+	}
+}
+
 func luma(c ui.Color) float32 {
 	return 0.2126*float32(c.R) + 0.7152*float32(c.G) + 0.0722*float32(c.B)
 }
