@@ -4,6 +4,14 @@ A native window for the model files already on disk. It catalogs hub caches, run
 
 The window is [MyGo](https://mygo.egoist.dev) native UI. There is no web page and no webview.
 
+## Snapshots
+
+![Size map](docs/map.png)
+
+![Gallery](docs/gallery.png)
+
+![Details](docs/details.png)
+
 ## Run
 
 Needs Go 1.27.
@@ -16,14 +24,15 @@ go run .
 
 ## Install
 
-A tag `v0.1.0` publishes the installers. Pick the one for your machine from the [releases](https://github.com/jstdlee/lodestone/releases).
+A tag `v0.1.1` publishes the installers. Pick the one for your machine from the [releases](https://github.com/jstdlee/lodestone/releases).
 
 | System | File | Install |
 | --- | --- | --- |
-| macOS | `lodestone-0.1.0-arm64.dmg`, `lodestone-0.1.0-amd64.dmg` | Open the disk image and drag Lodestone to Applications |
-| Windows | `lodestone-setup-0.1.0-*.exe` | Run the installer. It installs for the current user |
-| Linux | `lodestone_0.1.0_*.deb` | `sudo apt install ./lodestone_0.1.0_*.deb`, then `lodestone` |
-| Linux | `lodestone-0.1.0-linux-*.tar.gz` | Unpack and run `./install.sh`. It installs for the current user and adds `~/.local/bin/lodestone` |
+| macOS M series | `lodestone-0.1.1-arm64.dmg` | Open the disk image and drag Lodestone to Applications |
+| Windows x64 | `lodestone-setup-0.1.1-amd64.exe` | Run the installer. It installs for the current user |
+| Linux x64 | `lodestone_0.1.1_amd64.deb` | `sudo apt install ./lodestone_0.1.1_amd64.deb`, then `lodestone` |
+| Linux ARM64 | `lodestone_0.1.1_arm64.deb` | `sudo apt install ./lodestone_0.1.1_arm64.deb`, then `lodestone` |
+| Linux, either | `lodestone-0.1.1-linux-amd64.tar.gz`, `lodestone-0.1.1-linux-arm64.tar.gz` | Unpack and run `./install.sh`. It installs for the current user and adds `~/.local/bin/lodestone` |
 
 The Linux packages depend on GTK 3 only. The app draws its own window, so WebKitGTK is not required. The builds are not signed: Gatekeeper on another Mac, and SmartScreen on Windows, will warn.
 
@@ -119,14 +128,9 @@ Hub repos are folders named `models--org--name` (or `datasets--`, `spaces--`). T
 
 ## Releases
 
-The version is `version` in `mygo.json`. A tag of `v` plus that version builds and publishes the release. `v0.1.0` matches `"version": "0.1.0"`. Any other tag fails before it builds.
+The version is `version` in `mygo.json`. Run the Release workflow from the Actions tab. It tags `v` plus that version, when the tag is missing, and that tag publishes the release. `v0.1.1` matches `"version": "0.1.1"`. Any other tag fails before it builds. Pushing the tag yourself publishes the same way.
 
-```sh
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-GitHub Actions then builds macOS (arm64 and amd64), Windows (amd64 and arm64), and Linux (amd64 and arm64), uploads the disk images, installers, Debian packages, and archives, and publishes the release. Push the same tag again to replace the files.
+The release is four builds: macOS on Apple silicon (M series), Windows x64, Linux x64, and Linux ARM64. Each upload is the disk image, the installer, or the Debian package and archive for that machine.
 
 ## Tests
 

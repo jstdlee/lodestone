@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags: ["v*"]
 
@@ -8,7 +9,26 @@ permissions:
   contents: write
 
 jobs:
+  tag:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tag the version in mygo.json
+        run: |
+          version=$(jq -r .version mygo.json)
+          tag="v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "tag $tag already exists; bump version in mygo.json" >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Lodestone $version"
+          git push origin "$tag"
+
   draft-release:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -25,22 +45,24 @@ jobs:
 
   build:
     needs: draft-release
+    if: github.event_name == 'push'
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: macOS, os: macos-latest, platform: "darwin/arm64,darwin/amd64" }
-          - { name: Windows, os: ubuntu-latest, platform: "windows/amd64,windows/arm64" }
-          - { name: Linux, os: ubuntu-latest, platform: "linux/amd64,linux/arm64" }
+          - { name: macOS M series, os: macos-latest, platform: darwin/arm64 }
+          - { name: Windows x64, os: ubuntu-latest, platform: windows/amd64 }
+          - { name: Linux x64, os: ubuntu-latest, platform: linux/amd64 }
+          - { name: Linux ARM64, os: ubuntu-latest, platform: linux/arm64 }
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Install NSIS, for the Windows installers
-        if: matrix.name == 'Windows'
+      - name: Install NSIS, for the Windows installer
+        if: matrix.name == 'Windows x64'
         run: sudo apt-get update && sudo apt-get install -y nsis
       - name: Build
         run: go tool mygo build -platform "${{ matrix.platform }}"
@@ -58,6 +80,7 @@ jobs:
 
   publish:
     needs: build
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - env:
