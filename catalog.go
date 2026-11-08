@@ -451,4 +451,4 @@ var Patterns = []Pattern{
 }
 
 // Categories is the sidebar order.
-var Categories = []string{"Hub", "Runners", "Image & audio", "Training", "Engines", "Runtime", "Loose weights", "Large files"}
+var Categories = []string{"Hub", "Runners", "Image & audio", "Training", "Engines", "Runtime", "Custom", "Loose weights", "Large files"}

@@ -22,6 +22,8 @@ type app struct {
 	split         float32
 	pane          float32
 	detail        bool
+	gallery       bool
+	cards         ui.GridState
 	wantScroll    bool
 	pendingScroll int
 	pulseKey      string
@@ -36,7 +38,16 @@ type app struct {
 	scanning    bool
 	phase       string
 	status      string
+	again       bool
 	scanGen     int
+	customs     []CustomDir
+	customPath  string
+	placesOpen  bool
+	drafting    bool
+	draftName   string
+	draftPath   string
+	confirmDel  string
+	pickDir     func() (string, error)
 	reveal      func(string) error
 	copyText    func(string) error
 	scan        func(func(string)) Snapshot
@@ -57,6 +68,7 @@ func newApp() *app {
 
 func (a *app) rescan() {
 	if a.scanning {
+		a.again = true
 		return
 	}
 	a.scanning = true
@@ -90,7 +102,7 @@ func (a *app) runScan(progress func(string)) Snapshot {
 	if a.scan != nil {
 		return a.scan(progress)
 	}
-	return Scan(realEnviron(), progress)
+	return scanDirs(realEnviron(), a.customs, a.home, progress)
 }
 
 func (a *app) finishScan(snap Snapshot) {
@@ -100,6 +112,10 @@ func (a *app) finishScan(snap Snapshot) {
 	a.status = itoa(len(snap.Stores)) + " stores · " + itoa(len(snap.Large)) + " large files · " + formatBytes(snap.Unique) + " unique"
 	if len(snap.Warnings) > 0 {
 		a.status += " · " + snap.Warnings[0]
+	}
+	if a.again {
+		a.again = false
+		a.rescan()
 	}
 }
 
@@ -112,6 +128,9 @@ func mygoCopy(text string) error {
 
 func main() {
 	a := newApp()
+	if err := a.loadCustoms(); err != nil {
+		a.status = "Custom directories: " + err.Error()
+	}
 	mygo.App.WhenReady(func() {
 		a.scanning = true
 		a.phase = "Reading caches…"

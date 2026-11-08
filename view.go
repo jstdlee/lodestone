@@ -54,9 +54,16 @@ func (a *app) view(c *ui.Context) {
 	ui.Column(c).Fill().Padding(14, 16).Gap(10).Children(func() {
 		a.header(c, t)
 		ui.SearchField(c, &a.query).Placeholder("Name or path").Label("Search").Width(360)
+		if a.placesOpen {
+			a.places(c, t)
+		}
 		if !a.detail {
 			a.dashboard(c, t, matched)
-			a.treemap(c, t, true)
+			if a.gallery {
+				a.galleryView(c, t)
+			} else {
+				a.treemap(c, t, true)
+			}
 		} else {
 			a.treemap(c, t, false)
 			ui.Split(c, &a.split, func() { a.sidebar(c) }, func() {
@@ -96,6 +103,7 @@ func (a *app) header(c *ui.Context, t *ui.Theme) {
 			ui.Text(c, "Model caches, loose weights, and large files.").TextColor(t.TextMuted)
 		})
 		a.headerIcon(c, iconRefresh, "Rescan", "Scan again", !a.scanning, a.rescan)
+		a.headerIcon(c, iconPlaces, "Directories", "Custom directories", true, func() { a.placesOpen = !a.placesOpen })
 		themeIcon := iconMoon
 		themeTip := "Dark theme"
 		if a.dark {
@@ -104,6 +112,11 @@ func (a *app) header(c *ui.Context, t *ui.Theme) {
 		}
 		a.headerIcon(c, themeIcon, "Theme", themeTip, true, func() { a.dark = !a.dark })
 		if !a.detail {
+			if a.gallery {
+				a.headerIcon(c, iconMap, "Map", "Size map", true, func() { a.gallery = false })
+			} else {
+				a.headerIcon(c, iconGallery, "Gallery", "Gallery of files", true, func() { a.gallery = true })
+			}
 			a.headerIcon(c, iconList, "Details", "Category list", true, func() { a.detail = true })
 		}
 	})
@@ -184,7 +197,7 @@ func (a *app) treemap(c *ui.Context, t *ui.Theme, hero bool) {
 		}
 		for i := range entries {
 			entry := entries[i]
-			ui.Box(c).Absolute().Fill().
+			block := ui.Box(c).Absolute().Fill().
 				HitTest(func(x, y float32, r ui.Rect) bool {
 					return cellContains(layoutTreemap(sizes, r.W, r.H), i, x-r.X, y-r.Y)
 				}).
@@ -204,44 +217,36 @@ func (a *app) treemap(c *ui.Context, t *ui.Theme, hero bool) {
 					if !ok || cell.w < 2 || cell.h < 2 {
 						return
 					}
-					color := categoryColor(entry.cat)
-					if entry.other {
-						color = t.Border
-					}
 					rect := ui.Rect{X: r.X + cell.x + 1, Y: r.Y + cell.y + 1, W: cell.w - 2, H: cell.h - 2}
 					if rect.W < 1 || rect.H < 1 {
 						return
 					}
-					p.Fill(rect, color, 4)
 					selected := entry.key != "" && entry.key == a.selectedKey
+					glow := float32(-1)
 					if selected {
-						wash := float32(0.14)
-						if pulse > 0 {
-							wash = 0.08 + 0.18*pulse
-						}
-						p.Fill(rect, ui.Hex("#ffffff").Alpha(wash), 4)
-						inset := ui.Rect{X: rect.X + 5, Y: rect.Y + 5, W: rect.W - 10, H: rect.H - 10}
-						if inset.W > 8 && inset.H > 8 {
-							p.Stroke(inset, ui.Hex("#ffffff"), 4, 4)
-						}
+						glow = pulse
 					}
-					a.paintBlock(p, rect, entry, selected)
+					g := shadeGradient(blockGradient(entry.cat, entry.other, i), glow, !selected && a.selectedKey != "")
+					p.FillGradient(rect, g, 6)
+					ink := ui.Hex("#ffffff")
+					if n := len(g.Stops); n > 0 {
+						ink = inkOn(g.Stops[n/2].Color)
+					}
+					a.paintBlock(p, rect, entry, ink)
 				})
+			if entry.other {
+				placeTip(c, t, block, "Other", "The rest of this view, combined")
+			} else {
+				placeTip(c, t, block, tipTitle(entry.name, entry.path), entry.path)
+			}
 		}
 	})
 }
 
-func (a *app) paintBlock(p *ui.Painter, box ui.Rect, entry mapEntry, selected bool) {
+func (a *app) paintBlock(p *ui.Painter, box ui.Rect, entry mapEntry, ink ui.Color) {
 	nameSize, subSize := blockFont(box.W, box.H)
 	if nameSize < 9 {
 		return
-	}
-	ink := blockInk(entry)
-	if selected {
-		ink = ui.Hex("#ffffff")
-		if entry.cat == "Engines" || entry.other {
-			ink = ui.Hex("#1d1d1f")
-		}
 	}
 	pad := float32(6)
 	span, _, th, fit := fitLabel(p, entry.name, box.W-pad*2, nameSize, ink)
@@ -299,13 +304,6 @@ func blockFont(w, h float32) (name, sub float32) {
 	return name, sub
 }
 
-func blockInk(entry mapEntry) ui.Color {
-	if entry.other || entry.cat == "Engines" {
-		return ui.Hex("#1d1d1f")
-	}
-	return ui.Hex("#ffffff")
-}
-
 func (a *app) blink(el ui.Element) float32 {
 	if a.selectedKey == "" || a.pulseKey != a.selectedKey {
 		return 0
@@ -315,9 +313,9 @@ func (a *app) blink(el ui.Element) float32 {
 	}
 	target := float32(1)
 	if a.pulseDown {
-		target = 0.55
+		target = 0
 	}
-	v := el.AnimateTo("blink", target, ui.Animation{Duration: 220 * time.Millisecond, Ease: ui.EaseInOut})
+	v := el.AnimateTo("blink", target, ui.Animation{Duration: 340 * time.Millisecond, Ease: ui.EaseInOut})
 	if abs32(v-target) < 0.05 {
 		a.pulseDown = !a.pulseDown
 		a.pulseN++
@@ -434,6 +432,97 @@ func (a *app) sideItem(c *ui.Context, id, label string) {
 	})
 }
 
+func (a *app) galleryView(c *ui.Context, t *ui.Theme) {
+	host := ui.Column(c).Fill().Grow(1)
+	if len(a.rows) == 0 {
+		msg := "Nothing to show"
+		if strings.TrimSpace(a.query) != "" {
+			msg = "No matches"
+		}
+		host.Children(func() {
+			ui.Column(c).Fill().Center().Children(func() {
+				ui.Text(c, msg).TextColor(t.TextMuted)
+			})
+		})
+		return
+	}
+	pulse := a.blink(host)
+	host.Children(func() {
+		ui.GridView(c, &a.cards, len(a.rows), 220, 168, func(i int) {
+			r := a.rows[i]
+			selected := r.key != "" && r.key == a.selectedKey
+			glow := float32(-1)
+			if selected {
+				glow = pulse
+			}
+			g := shadeGradient(blockGradient(r.category, false, i), glow, !selected && a.selectedKey != "")
+			card := ui.Column(c).Fill().Radius(10).Clip().Background(t.Surface).OnClick(func() {
+				if r.key == "" {
+					return
+				}
+				a.selectedKey = r.key
+				a.anchorPath = r.path
+				a.armPulse(r.key)
+				a.wantScroll = true
+			})
+			card.Children(func() {
+				ui.Box(c).Height(72).FillWidth().LinearGradient(g)
+				ui.Column(c).Padding(8, 10).Gap(2).Grow(1).Children(func() {
+					ui.Text(c, r.name).Bold().SingleLine()
+					ui.Text(c, formatBytes(r.bytes)+" · "+r.category).FontSize(12).TextColor(t.TextMuted).SingleLine()
+					if r.path != "" {
+						ui.Text(c, tilde(a.home, r.path)).FontSize(11).TextColor(t.TextMuted).SingleLine()
+					}
+				})
+			})
+			placeTip(c, t, card, tipTitle(r.name, r.path), r.path)
+		}).Grow(1).Fill()
+	})
+}
+
+func tipTitle(name, path string) string {
+	base := ""
+	if path != "" {
+		base = filepath.Base(path)
+	}
+	switch {
+	case name == "":
+		return base
+	case base == "" || base == "." || base == name:
+		return name
+	default:
+		return base + " · " + name
+	}
+}
+
+func placeTip(c *ui.Context, t *ui.Theme, anchor ui.Element, title, path string) {
+	title = strings.TrimSpace(title)
+	path = strings.TrimSpace(path)
+	if title == "" && path == "" {
+		return
+	}
+	if path == title {
+		path = ""
+	}
+	fill, ink := ui.Hex("#1d1d1f"), ui.Hex("#f4f5f7")
+	if t.Dark {
+		fill, ink = ui.Hex("#f4f5f7"), ui.Hex("#1d1d1f")
+	}
+	ui.TooltipBase(c, anchor, func(tip ui.Element) {
+		tip.MaxWidth(440).Padding(8, 10).Radius(8).Background(fill).TextColor(ink)
+		tip.Children(func() {
+			ui.Column(c).Gap(3).Children(func() {
+				if title != "" {
+					ui.Text(c, title).Bold()
+				}
+				if path != "" {
+					ui.Text(c, path).FontSize(12)
+				}
+			})
+		})
+	})
+}
+
 func (a *app) listPane(c *ui.Context, t *ui.Theme) {
 	if a.pendingScroll >= 0 && a.pendingScroll < len(a.rows) {
 		a.list.ScrollIntoView(a.pendingScroll)
@@ -468,7 +557,8 @@ func (a *app) listPane(c *ui.Context, t *ui.Theme) {
 		Rows(func(lr ui.ListRow) {
 			r := a.rows[lr.Index]
 			rc := lr.Context
-			ui.Row(rc).Padding(6, 12).Gap(10).AlignItems(ui.Center).Children(func() {
+			line := ui.Row(rc).Padding(6, 12).Gap(10).AlignItems(ui.Center)
+			line.Children(func() {
 				ui.Box(rc).Size(8, 8).Radius(4).Background(categoryColor(r.category)).Shrink(0)
 				ui.Column(rc).Grow(1).Gap(1).Children(func() {
 					ui.Text(rc, r.name).SingleLine()
@@ -490,6 +580,7 @@ func (a *app) listPane(c *ui.Context, t *ui.Theme) {
 					a.copyRow(key, path)
 				})
 			})
+			placeTip(rc, t, line, tipTitle(r.name, r.path), r.path)
 		})
 	if list.Submitted() {
 		a.openCurrent()
@@ -523,26 +614,33 @@ func (a *app) inspector(c *ui.Context, t *ui.Theme) {
 			ui.Text(c, "Select a row").TextColor(t.TextMuted)
 			return
 		}
-		ui.Text(c, r.name).Bold().SingleLine()
+		nameEl := ui.Text(c, r.name).Bold().SingleLine()
+		placeTip(c, t, nameEl, tipTitle(r.name, r.path), r.path)
 		if r.sub != "" {
-			ui.Text(c, r.sub).TextColor(t.TextMuted).SingleLine()
+			subEl := ui.Text(c, r.sub).TextColor(t.TextMuted).SingleLine()
+			placeTip(c, t, subEl, r.sub, r.path)
 		}
 		ui.Text(c, formatBytes(r.bytes)+" · "+r.category).FontSize(12).TextColor(t.TextMuted)
 		if r.blurb != "" {
-			ui.Text(c, r.blurb).MaxLines(4).TextColor(t.TextMuted)
+			blurbEl := ui.Text(c, r.blurb).MaxLines(4).TextColor(t.TextMuted)
+			placeTip(c, t, blurbEl, r.blurb, "")
 		}
 		if r.path != "" {
 			ui.Text(c, "Path").FontSize(12).TextColor(t.TextMuted)
-			ui.Text(c, tilde(a.home, r.path)).Selectable().MaxLines(3)
+			pathEl := ui.Text(c, tilde(a.home, r.path)).Selectable().MaxLines(3)
+			placeTip(c, t, pathEl, tipTitle(r.name, r.path), r.path)
 		}
 		if r.layout != "" {
-			ui.Text(c, r.layout).FontSize(12).MaxLines(2)
+			layoutEl := ui.Text(c, r.layout).FontSize(12).MaxLines(2)
+			placeTip(c, t, layoutEl, r.layout, "")
 		}
 		if r.env != "" {
-			ui.Text(c, r.env).FontSize(12).TextColor(t.TextMuted).MaxLines(2)
+			envEl := ui.Text(c, r.env).FontSize(12).TextColor(t.TextMuted).MaxLines(2)
+			placeTip(c, t, envEl, r.env, "")
 		}
 		if r.note != "" {
-			ui.Text(c, r.note).FontSize(12).TextColor(t.TextMuted).MaxLines(2)
+			noteEl := ui.Text(c, r.note).FontSize(12).TextColor(t.TextMuted).MaxLines(2)
+			placeTip(c, t, noteEl, r.note, "")
 		}
 	})
 }
@@ -605,14 +703,14 @@ func diskRows(snap Snapshot) []row {
 	var out []row
 	for _, st := range snap.Stores {
 		if len(st.Entries) == 0 {
-			if st.Bytes <= 0 {
+			if st.Bytes <= 0 && st.Category != "Custom" {
 				continue
 			}
 			out = append(out, row{
 				key: "store\x00" + st.Path, name: st.Name, sub: st.Note,
 				path: st.Path, category: st.Category, tools: st.Tools,
 				blurb: st.Blurb, layout: st.Layout, env: st.Env, note: st.Note,
-				bytes: st.Bytes, exists: true,
+				bytes: st.Bytes, exists: st.Active && st.Note != "missing" && st.Note != "not a directory",
 			})
 			continue
 		}

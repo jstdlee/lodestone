@@ -10,8 +10,10 @@ type treemapCell struct {
 }
 
 // layoutTreemap packs sizes into width×height. Zero sizes are skipped.
-// Areas sum to the rectangle. Larger values are placed first, and index
-// points back at the input.
+// Area follows log2(bytes/smallest)+1. A file twice as big gets about twice
+// the area, and one a thousand times bigger about eleven times the area,
+// so the steps stay visible without a huge file erasing the labels.
+// Larger values are placed first, and index points back at the input.
 func layoutTreemap(sizes []int64, width, height float32) []treemapCell {
 	if width < 1 || height < 1 {
 		return nil
@@ -35,9 +37,19 @@ func layoutTreemap(sizes []int64, width, height float32) []treemapCell {
 			j--
 		}
 	}
-	scale := float64(width) * float64(height) / float64(total)
+	minBytes := items[len(items)-1].bytes
+	var weight float64
 	for i := range items {
-		items[i].area = float64(items[i].bytes) * scale
+		w := math.Log2(float64(items[i].bytes)/float64(minBytes)) + 1
+		if w < 1 {
+			w = 1
+		}
+		items[i].area = w
+		weight += w
+	}
+	scale := float64(width) * float64(height) / weight
+	for i := range items {
+		items[i].area *= scale
 	}
 	var cells []treemapCell
 	squarify(items, 0, 0, float64(width), float64(height), &cells)

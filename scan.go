@@ -99,6 +99,11 @@ func (m *meter) add(info os.FileInfo) {
 
 // Scan reads every pattern and then loose weight files outside those stores.
 func Scan(env Environ, progress func(string)) Snapshot {
+	return scanDirs(env, nil, "", progress)
+}
+
+// scanDirs is Scan plus directories the user added.
+func scanDirs(env Environ, extra []CustomDir, home string, progress func(string)) Snapshot {
 	if progress == nil {
 		progress = func(string) {}
 	}
@@ -189,6 +194,7 @@ func Scan(env Environ, progress func(string)) Snapshot {
 		}
 	}
 
+	addCustomStores(&snap, extra, measured, global, home, progress)
 	progress("Looking for loose weights and large files…")
 	var roots []string
 	for path := range measured {

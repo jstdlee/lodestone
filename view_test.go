@@ -169,3 +169,37 @@ func TestRescanReplacesRows(t *testing.T) {
 		t.Fatal("scan still marked running")
 	}
 }
+
+func TestGallerySelectsCard(t *testing.T) {
+	dir := t.TempDir()
+	model := filepath.Join(dir, "model.gguf")
+	a := newApp()
+	a.home = dir
+	a.snap = Snapshot{
+		Unique: 80,
+		Stores: []Store{{
+			ID: "lmstudio", Name: "LM Studio", Tools: "lms", Category: "Runners",
+			Path: dir, Active: true, Bytes: 80,
+			Entries: []Entry{{Name: "publisher/model", Path: model, Bytes: 80, Detail: "gguf"}},
+		}},
+	}
+	tt := ui.NewTester(a.view, 1100, 740)
+	if err := tt.Click("Gallery"); err != nil {
+		t.Fatal(err)
+	}
+	if !tt.HasText("publisher/model") {
+		t.Fatalf("gallery: %q", tt.Texts())
+	}
+	if err := tt.Click("publisher/model"); err != nil {
+		t.Fatal(err)
+	}
+	if a.selectedKey != "lmstudio\x00"+model {
+		t.Fatalf("selected %q", a.selectedKey)
+	}
+	if err := tt.Click("Map"); err != nil {
+		t.Fatal(err)
+	}
+	if a.gallery {
+		t.Fatal("map did not close the gallery")
+	}
+}
