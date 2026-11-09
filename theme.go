@@ -6,56 +6,119 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-// lodestoneTheme is Lodestone's mineral survey chrome: graphite surfaces,
-// hairlines, and a monochrome accent, so hue stays with the categories and
-// the blocks they mark.
+// keroWashes are the kero themes Lodestone carries, as kero's settings
+// name them (theme = light:mist, dark:paper): kero/theme.go's two washes
+// with their tone.
+type keroWash struct {
+	light, dark []string
+	tone        keroTone
+}
+
+// keroTone is a kero theme's tone: the hue, how white the light paper is
+// (tint), how strong the programs' colors stand (vivid) and the hue of
+// the accent, the cursor, selection and controls.
+type keroTone struct{ hue, tint, vivid, accent float32 }
+
+var keroWashes = map[string]keroWash{
+	// Sea above, blue-gray fading to warm paper below.
+	"mist": {
+		light: []string{"#e3e9f4", "#ebeff6", "#f1f2f3", "#f2f1ec"},
+		dark:  []string{"#0c1628", "#0d1827", "#111b23"},
+		tone:  keroTone{255, 1, 0.8, 255},
+	},
+	// White on a desk of near-neutral dark, flat and quiet.
+	"paper": {
+		light: []string{"#f6f6f7", "#f7f7f8", "#f8f8f8"},
+		dark:  []string{"#141416", "#151517", "#161618"},
+		tone:  keroTone{260, 0, 0.9, 262},
+	},
+}
+
+// lodestoneTheme is Lodestone's chrome, kero's as the host terminal means
+// it: mist when light, paper when dark. Hue stays with the categories and
+// the blocks they mark; the surfaces and controls carry the looks.
 func lodestoneTheme(dark bool) *ui.Theme {
 	if dark {
+		return keroLook("paper", true)
+	}
+	return keroLook("mist", false)
+}
+
+// keroLook colors the chrome from one kero wash, kero's tinted() doing
+// the chart: the surfaces are the theme card, the text its foreground,
+// the accent its cursor color, and the control faces and hairlines what
+// kero's palettes draw.
+func keroLook(id string, dark bool) *ui.Theme {
+	w, ok := keroWashes[id]
+	if !ok {
+		w = keroWashes["paper"]
+		id = "paper"
+	}
+	hexes := w.light
+	if dark {
+		hexes = w.dark
+	}
+	wash := ui.Hex(hexes[len(hexes)/2])
+	card, fg, accent, selection := keroToneColors(w.tone, dark)
+
+	if dark {
 		t := ui.DarkTheme()
-		t.Background = ui.Hex("#101011")
-		t.Surface = ui.Hex("#19191b")
-		t.SurfaceHover = ui.Hex("#232325")
-		t.SurfacePressed = ui.Hex("#2c2c2e")
-		t.Border = ui.RGBA(237, 237, 237, 0.09)
-		t.Text = ui.Hex("#ededed")
-		t.TextMuted = ui.Hex("#a1a1a6")
-		t.Accent = ui.Hex("#ededed")
-		t.AccentHover = ui.Hex("#ffffff")
-		t.AccentPressed = ui.Hex("#c8c8cc")
-		t.AccentText = ui.Hex("#171717")
-		t.Danger = ui.Hex("#e5484d")
-		t.Warning = ui.Hex("#e8a33d")
-		t.Success = ui.Hex("#4cc38a")
-		t.Selection = ui.RGBA(237, 237, 237, 0.12)
-		t.Focus = ui.RGBA(237, 237, 237, 0.45)
-		t.Scrollbar = ui.RGBA(237, 237, 237, 0.28)
+		t.Background = wash
+		t.Surface = card
+		t.SurfaceHover = card.Mix(fg, 0.05)
+		t.SurfacePressed = card.Mix(fg, 0.11)
+		t.Border = ui.RGBA(255, 255, 255, 0.08)
+		t.Text = fg
+		t.TextMuted = fg.Mix(card, 0.38)
+		t.Accent = accent
+		t.AccentHover = accent.Mix(fg, 0.12)
+		t.AccentPressed = accent.Mix(fg, 0.22)
+		t.AccentText = card
+		t.Danger = ui.Hex("#ff6961")
+		t.Warning = ui.Hex("#f0a33a")
+		t.Success = ui.Hex("#4fd17a")
+		t.Selection = selection
+		t.Focus = accent.Alpha(0.45)
+		t.Scrollbar = fg.Alpha(0.28)
 		t.Radius = 8
 		t.InactiveAccent = t.Accent
 		t.TooltipDelay = 400 * time.Millisecond
 		return t
 	}
 	t := ui.LightTheme()
-	t.Background = ui.Hex("#f0f0f2")
-	t.Surface = ui.Hex("#ffffff")
-	t.SurfaceHover = ui.Hex("#f4f4f5")
-	t.SurfacePressed = ui.Hex("#e4e4e7")
-	t.Border = ui.RGBA(23, 23, 23, 0.09)
-	t.Text = ui.Hex("#171717")
-	t.TextMuted = ui.Hex("#737373")
-	t.Accent = ui.Hex("#26262b")
-	t.AccentHover = ui.Hex("#17171a")
-	t.AccentPressed = ui.Hex("#3f3f46")
+	t.Background = wash
+	t.Surface = card
+	t.SurfaceHover = card.Mix(fg, 0.04)
+	t.SurfacePressed = card.Mix(fg, 0.07)
+	t.Border = ui.RGBA(0, 0, 0, 0.07)
+	t.Text = fg
+	t.TextMuted = fg.Mix(card, 0.38)
+	t.Accent = accent
+	t.AccentHover = accent.Mix(fg, 0.10)
+	t.AccentPressed = accent.Mix(fg, 0.20)
 	t.AccentText = ui.Hex("#ffffff")
-	t.Danger = ui.Hex("#dc2626")
-	t.Warning = ui.Hex("#b45309")
-	t.Success = ui.Hex("#16a34a")
-	t.Selection = ui.RGBA(23, 23, 23, 0.08)
-	t.Focus = ui.RGBA(23, 23, 23, 0.35)
-	t.Scrollbar = ui.RGBA(23, 23, 23, 0.28)
+	t.Danger = ui.Hex("#d93a35")
+	t.Warning = ui.Hex("#c27b0f")
+	t.Success = ui.Hex("#2f8a3f")
+	t.Selection = selection
+	t.Focus = accent.Alpha(0.35)
+	t.Scrollbar = fg.Alpha(0.28)
 	t.Radius = 8
 	t.InactiveAccent = t.Accent
 	t.TooltipDelay = 400 * time.Millisecond
 	return t
+}
+
+// keroToneColors is a tone's card, card text, accent and selection, kero's
+// toneTheme's beginnings: the card tinted with the hue, in the light the
+// whiter the less tinted, in the dark a deep tinted ground.
+func keroToneColors(t keroTone, dark bool) (card, fg, accent, selection ui.Color) {
+	tint := func(l, c float32) ui.Color { return ui.Oklch(l, c*t.tint, t.hue) }
+	if dark {
+		return tint(0.255, 0.02), tint(0.92, 0.015), ui.Oklch(0.74, 0.13, t.accent), ui.Oklch(0.38, 0.06, t.accent)
+	}
+	paper := 0.978 + 0.022*max(0, 1-t.tint/0.5)
+	return tint(paper, 0.012), tint(0.28, 0.03), ui.Oklch(0.55, 0.13, t.accent), ui.Oklch(0.9, 0.045, t.accent)
 }
 
 func categoryColor(cat string) ui.Color {

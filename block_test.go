@@ -16,22 +16,32 @@ func TestThemeTooltipDelay(t *testing.T) {
 }
 
 func TestThemeChromeIsNeutral(t *testing.T) {
-	for _, dark := range []bool{false, true} {
-		tt := lodestoneTheme(dark)
-		for name, c := range map[string]ui.Color{
-			"background":    tt.Background,
-			"surface":       tt.Surface,
-			"surface hover": tt.SurfaceHover,
-			"accent":        tt.Accent,
-			"accent hover":  tt.AccentHover,
-			"text":          tt.Text,
-			"text muted":    tt.TextMuted,
-		} {
-			lo, hi := min3(c.R, c.G, c.B), max3(c.R, c.G, c.B)
-			if hi-lo > 6 {
-				t.Fatalf("dark %v %s %v carries hue: %d channels apart", dark, name, c, hi-lo)
-			}
+	// The dark look is kero's paper: tint 0, so no hue may leak into the
+	// chrome. The light look is mist, where the blue-gray wash is the
+	// design; the blocks alone are allowed the bright degrees of hue.
+	tt := lodestoneTheme(true)
+	for name, c := range map[string]ui.Color{
+		"background":    tt.Background,
+		"surface":       tt.Surface,
+		"surface hover": tt.SurfaceHover,
+		"text":          tt.Text,
+		"text muted":    tt.TextMuted,
+	} {
+		lo, hi := min3(c.R, c.G, c.B), max3(c.R, c.G, c.B)
+		if hi-lo > 6 {
+			t.Fatalf("dark %s %v carries hue: %d channels apart", name, c, hi-lo)
 		}
+	}
+	tt = lodestoneTheme(false)
+	if l := luma(tt.Background); l < 225 {
+		t.Fatalf("light background not paper: luma %.0f", l)
+	}
+	if l := luma(tt.Text); l > 90 {
+		t.Fatalf("light text not ink: luma %.0f", l)
+	}
+	lo, hi := min3(tt.Accent.R, tt.Accent.G, tt.Accent.B), max3(tt.Accent.R, tt.Accent.G, tt.Accent.B)
+	if hi-lo < 30 {
+		t.Fatalf("light accent not the mist blue: %d channels apart", hi-lo)
 	}
 }
 
