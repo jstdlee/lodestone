@@ -9,47 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.tag.outputs.tag }}
-    steps:
-      - uses: actions/checkout@v7
-      - id: tag
-        name: Check the version
-        run: |
-          version=$(jq -r .version mygo.json)
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            tag="$GITHUB_REF_NAME"
-          else
-            tag="v$version"
-          fi
-          test "$tag" = "v$version"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-      - name: Tag the version
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          tag="${{ steps.tag.outputs.tag }}"
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "tag $tag already exists"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag -a "$tag" -m "Lodestone ${tag#v}"
-            git push origin "$tag"
-          fi
-      - name: Create the draft release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="${{ steps.tag.outputs.tag }}"
-          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" --draft --title "Lodestone ${tag#v}" --generate-notes
-          fi
-
   build:
-    needs: prepare
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -70,24 +30,49 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y nsis
       - name: Build
         run: go tool mygo build -platform "${{ matrix.platform }}"
-      - name: Upload to the draft release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.prepare.outputs.tag }}
-        run: |
-          shopt -s nullglob
-          files=(build/*/*.dmg build/*/*-setup-*.exe build/*/*.deb build/*/*.tar.gz)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "no release files under build/" >&2
-            exit 1
-          fi
-          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+      - name: Collect release files
+        run: shopt -s nullglob; files=(build/*/*.dmg build/*/*-setup-*.exe build/*/*.deb build/*/*.tar.gz); if [ ${#files[@]} -eq 0 ]; then echo "no release files under build/" >&2; exit 1; fi; mkdir releases; cp "${files[@]}" releases/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: releases/
 
   publish:
-    needs: [prepare, build]
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - env:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+      - name: Resolve the version
+        id: tag
+        run: |
+          version=$(jq -r .version mygo.json)
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Tag and push the version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          tag="${{ steps.tag.outputs.tag }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "tag $tag already exists"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$tag" -m "Lodestone ${tag#v}" "$GITHUB_SHA"
+            git push origin "$tag"
+          fi
+      - name: Publish the release
+        env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.prepare.outputs.tag }}
-        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "Lodestone ${TAG#v}" --generate-notes \
+            artifacts/* 2>/dev/null \
+          || gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*
