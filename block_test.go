@@ -9,10 +9,52 @@ import (
 
 func TestThemeTooltipDelay(t *testing.T) {
 	for _, dark := range []bool{false, true} {
-		if got := keroTheme(dark).TooltipDelay; got != 400*time.Millisecond {
+		if got := lodestoneTheme(dark).TooltipDelay; got != 400*time.Millisecond {
 			t.Fatalf("dark %v delay %v", dark, got)
 		}
 	}
+}
+
+func TestThemeChromeIsNeutral(t *testing.T) {
+	for _, dark := range []bool{false, true} {
+		tt := lodestoneTheme(dark)
+		for name, c := range map[string]ui.Color{
+			"background":    tt.Background,
+			"surface":       tt.Surface,
+			"surface hover": tt.SurfaceHover,
+			"accent":        tt.Accent,
+			"accent hover":  tt.AccentHover,
+			"text":          tt.Text,
+			"text muted":    tt.TextMuted,
+		} {
+			lo, hi := min3(c.R, c.G, c.B), max3(c.R, c.G, c.B)
+			if hi-lo > 6 {
+				t.Fatalf("dark %v %s %v carries hue: %d channels apart", dark, name, c, hi-lo)
+			}
+		}
+	}
+}
+
+func min3(a, b, c uint8) uint8 {
+	m := a
+	if b < m {
+		m = b
+	}
+	if c < m {
+		m = c
+	}
+	return m
+}
+
+func max3(a, b, c uint8) uint8 {
+	m := a
+	if b > m {
+		m = b
+	}
+	if c > m {
+		m = c
+	}
+	return m
 }
 
 func TestBlockGradientVariesAndShines(t *testing.T) {

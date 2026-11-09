@@ -51,7 +51,7 @@ func (a *app) view(c *ui.Context) {
 	a.rows, a.counts = a.visibleRows()
 	a.syncSelection()
 	matched := a.matchedRows()
-	ui.Column(c).Fill().Padding(14, 16).Gap(10).Children(func() {
+	ui.Column(c).Fill().Padding(16, 20).Gap(12).Children(func() {
 		a.header(c, t)
 		ui.SearchField(c, &a.query).Placeholder("Name or path").Label("Search").Width(360)
 		if a.placesOpen {
@@ -77,7 +77,7 @@ func (a *app) view(c *ui.Context) {
 			}).Fill().Grow(1)
 		}
 		if status := a.statusLine(); status != "" {
-			ui.Text(c, status).TextColor(t.TextMuted).Role(ui.RoleStatus)
+			ui.Text(c, status).TextColor(t.TextMuted).Role(ui.RoleStatus).FontFeatures("tnum")
 		}
 	})
 	a.finishSelection()
@@ -88,7 +88,7 @@ func (a *app) applyTheme(c *ui.Context) *ui.Theme {
 		a.dark = c.Theme().Dark
 		a.themeReady = true
 	}
-	t := keroTheme(a.dark)
+	t := lodestoneTheme(a.dark)
 	c.SetTheme(t)
 	return t
 }
@@ -99,18 +99,18 @@ func (a *app) header(c *ui.Context, t *ui.Theme) {
 			a.headerIcon(c, iconBack, "Home", "Back to the map", true, func() { a.detail = false })
 		}
 		ui.Column(c).Grow(1).Gap(1).Children(func() {
-			ui.Text(c, "Lodestone").FontSize(20).Bold()
-			ui.Text(c, "Model caches, loose weights, and large files.").TextColor(t.TextMuted)
+			ui.Text(c, "Lodestone").FontSize(18).Bold()
+			ui.Text(c, "Model caches, loose weights, and large files.").FontSize(12).TextColor(t.TextMuted)
 		})
-		a.headerIcon(c, iconRefresh, "Rescan", "Scan again", !a.scanning, a.rescan)
-		a.headerIcon(c, iconPlaces, "Directories", "Custom directories", true, func() { a.placesOpen = !a.placesOpen })
+		a.headerIcon(c, iconRefresh, "Rescan", tip(a.scanning, "Scanning the caches already", "Scan the caches again"), !a.scanning, a.rescan)
+		a.headerIcon(c, iconPlaces, "Directories", "Add or hide a directory", true, func() { a.placesOpen = !a.placesOpen })
 		themeIcon := iconMoon
 		themeTip := "Dark theme"
 		if a.dark {
 			themeIcon = iconSun
 			themeTip = "Light theme"
 		}
-		a.headerIcon(c, themeIcon, "Theme", themeTip, true, func() { a.dark = !a.dark })
+		a.headerIcon(c, themeIcon, "Theme", themeTip+" — applies at once", true, func() { a.dark = !a.dark })
 		if !a.detail {
 			if a.gallery {
 				a.headerIcon(c, iconMap, "Map", "Size map", true, func() { a.gallery = false })
@@ -128,6 +128,15 @@ func (a *app) headerIcon(c *ui.Context, icon *ui.SVG, label, tip string, enabled
 	})
 }
 
+// tip is the tooltip for a state: why it is off when that is true, else
+// what it does.
+func tip(when bool, why, what string) string {
+	if when {
+		return why
+	}
+	return what
+}
+
 func (a *app) statusLine() string {
 	if a.scanning && a.phase != "" {
 		return a.phase
@@ -141,10 +150,30 @@ func (a *app) statusLine() string {
 	return ""
 }
 
+// emptyState is the moment when a view holds nothing: one grey sentence
+// that says what will appear, and, when a search filters it away, a way
+// to show everything again.
+func (a *app) emptyState(c *ui.Context, t *ui.Theme, idle string) {
+	q := strings.TrimSpace(a.query)
+	ui.Column(c).Fill().Center().Gap(8).Children(func() {
+		switch {
+		case a.scanning:
+			ui.Text(c, "Reading the caches…").TextColor(t.TextMuted)
+		case q != "":
+			ui.Text(c, "No files match “"+q+"”. Clear the search to see everything.").TextColor(t.TextMuted)
+			ui.Button(c, "Show everything").Padding(6, 12).OnClick(func() {
+				a.query = ""
+			})
+		default:
+			ui.Text(c, idle).TextColor(t.TextMuted)
+		}
+	})
+}
+
 func (a *app) dashboard(c *ui.Context, t *ui.Theme, matched []row) {
 	stats := categoryStats(matched)
-	ui.Row(c).Gap(8).AlignItems(ui.Stretch).Children(func() {
-		a.statChip(c, t, "all", "All", formatBytes(a.snap.Unique), "unique", a.category == "" || a.category == "all")
+	ui.Row(c).Gap(6).AlignItems(ui.Stretch).Wrap().Children(func() {
+		a.statChip(c, t, "all", "All", formatBytes(a.snap.Unique), itoa(len(matched))+" files", a.category == "" || a.category == "all")
 		for _, st := range stats {
 			a.statChip(c, t, st.name, st.name, formatBytes(st.bytes), itoa(st.n), a.category == st.name)
 		}
@@ -156,18 +185,20 @@ func (a *app) statChip(c *ui.Context, t *ui.Theme, id, label, size, hint string,
 	if on {
 		border = t.Accent
 	}
-	chip := ui.Column(c).Padding(7, 10).Gap(1).Radius(8).Background(t.Surface).Border(1, border).MinWidth(96).OnClick(func() {
+	ui.Button(c, "").Label("").Padding(6, 10).Radius(8).Shrink(0).Border(1, border).
+		Tooltip(size + " · " + hint).OnClick(func() {
 		a.category = id
-	})
-	chip.Children(func() {
-		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			if id != "all" {
-				ui.Box(c).Size(8, 8).Radius(4).Background(categoryColor(id)).Shrink(0)
-			}
-			ui.Text(c, label).FontSize(12).TextColor(t.TextMuted).SingleLine()
+	}).Children(func() {
+		ui.Column(c).Gap(2).MinWidth(96).Children(func() {
+			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
+				if id != "all" {
+					ui.Box(c).Size(8, 8).Radius(4).Background(categoryColor(id)).Shrink(0)
+				}
+				ui.Text(c, label).FontSize(12).TextColor(t.TextMuted).SingleLine()
+			})
+			ui.Text(c, size).Bold().FontFeatures("tnum").SingleLine()
+			ui.Text(c, hint).FontSize(12).TextColor(t.TextMuted).FontFeatures("tnum").SingleLine()
 		})
-		ui.Text(c, size).Bold().SingleLine()
-		ui.Text(c, hint).FontSize(11).TextColor(t.TextMuted)
 	})
 }
 
@@ -186,13 +217,7 @@ func (a *app) treemap(c *ui.Context, t *ui.Theme, hero bool) {
 	pulse := a.blink(box)
 	box.Children(func() {
 		if len(entries) == 0 {
-			msg := "Nothing to map"
-			if strings.TrimSpace(a.query) != "" {
-				msg = "No matches"
-			}
-			ui.Column(c).Fill().Center().Children(func() {
-				ui.Text(c, msg).TextColor(t.TextMuted)
-			})
+			a.emptyState(c, t, "Nothing to map yet. Scan the caches to fill the map.")
 			return
 		}
 		for i := range entries {
@@ -258,7 +283,7 @@ func (a *app) paintBlock(p *ui.Painter, box ui.Rect, entry mapEntry, ink ui.Colo
 	var sh float32
 	showSub := false
 	if subSize > 0 {
-		sub = ui.Span{Text: formatBytes(entry.bytes), Size: subSize, Weight: 500, Color: ink.Alpha(0.88)}
+		sub = ui.Span{Text: formatBytes(entry.bytes), Size: subSize, Weight: 500, Color: ink.Alpha(0.88), Features: "tnum"}
 		if sw, h := p.MeasureText(0, sub); sw <= box.W-pad*2 && th+h+4 <= box.H-pad {
 			sh = h
 			showSub = true
@@ -435,15 +460,7 @@ func (a *app) sideItem(c *ui.Context, id, label string) {
 func (a *app) galleryView(c *ui.Context, t *ui.Theme) {
 	host := ui.Column(c).Fill().Grow(1)
 	if len(a.rows) == 0 {
-		msg := "Nothing to show"
-		if strings.TrimSpace(a.query) != "" {
-			msg = "No matches"
-		}
-		host.Children(func() {
-			ui.Column(c).Fill().Center().Children(func() {
-				ui.Text(c, msg).TextColor(t.TextMuted)
-			})
-		})
+		host.Children(func() { a.emptyState(c, t, "Nothing to show yet. Scan the caches to fill the gallery.") })
 		return
 	}
 	pulse := a.blink(host)
@@ -456,7 +473,7 @@ func (a *app) galleryView(c *ui.Context, t *ui.Theme) {
 				glow = pulse
 			}
 			g := shadeGradient(blockGradient(r.category, false, i), glow, !selected && a.selectedKey != "")
-			card := ui.Column(c).Fill().Radius(10).Clip().Background(t.Surface).OnClick(func() {
+			card := ui.Column(c).Fill().Radius(12).Clip().Background(t.Surface).OnClick(func() {
 				if r.key == "" {
 					return
 				}
@@ -467,11 +484,11 @@ func (a *app) galleryView(c *ui.Context, t *ui.Theme) {
 			})
 			card.Children(func() {
 				ui.Box(c).Height(72).FillWidth().LinearGradient(g)
-				ui.Column(c).Padding(8, 10).Gap(2).Grow(1).Children(func() {
+				ui.Column(c).Padding(10, 12).Gap(3).Grow(1).Children(func() {
 					ui.Text(c, r.name).Bold().SingleLine()
-					ui.Text(c, formatBytes(r.bytes)+" · "+r.category).FontSize(12).TextColor(t.TextMuted).SingleLine()
+					ui.Text(c, formatBytes(r.bytes)+" · "+r.category).FontSize(12).TextColor(t.TextMuted).FontFeatures("tnum").SingleLine()
 					if r.path != "" {
-						ui.Text(c, tilde(a.home, r.path)).FontSize(11).TextColor(t.TextMuted).SingleLine()
+						ui.Text(c, tilde(a.home, r.path)).FontSize(12).TextColor(t.TextMuted).FontFeatures("tnum").SingleLine()
 					}
 				})
 			})
@@ -553,15 +570,7 @@ func (a *app) listPane(c *ui.Context, t *ui.Theme) {
 	}
 	a.pendingScroll = -1
 	if len(a.rows) == 0 {
-		msg := "Nothing in this view"
-		if a.scanning {
-			msg = "Reading caches…"
-		} else if strings.TrimSpace(a.query) != "" {
-			msg = "No matches"
-		}
-		ui.Column(c).Fill().Center().Children(func() {
-			ui.Text(c, msg).TextColor(t.TextMuted)
-		})
+		a.emptyState(c, t, "Nothing to list yet. Scan the caches to fill the list.")
 		return
 	}
 	var max int64 = 1
@@ -570,6 +579,7 @@ func (a *app) listPane(c *ui.Context, t *ui.Theme) {
 			max = r.bytes
 		}
 	}
+	a.list.Label = func(i int) string { return a.rows[i].name }
 	a.list.Selected = &a.selected
 	list := ui.List(c, &a.list, len(a.rows)).Fill().Grow(1).
 		ItemKey(func(i int) any {
@@ -581,20 +591,34 @@ func (a *app) listPane(c *ui.Context, t *ui.Theme) {
 		Rows(func(lr ui.ListRow) {
 			r := a.rows[lr.Index]
 			rc := lr.Context
-			line := ui.Row(rc).Padding(6, 12).Gap(10).AlignItems(ui.Center)
+			line := ui.Row(rc).FillWidth().Padding(4, 12).Gap(10).AlignItems(ui.Center)
 			line.Children(func() {
 				ui.Box(rc).Size(8, 8).Radius(4).Background(categoryColor(r.category)).Shrink(0)
-				ui.Column(rc).Grow(1).Gap(1).Children(func() {
+				ui.Column(rc).Grow(1).Gap(2).Children(func() {
 					ui.Text(rc, r.name).SingleLine()
 					ui.Text(rc, a.rowSub(r)).SingleLine().FontSize(12).TextColor(t.TextMuted)
 				})
-				ui.Column(rc).Width(132).Gap(3).Shrink(0).Children(func() {
-					ui.Meter(rc, float64(r.bytes), 0, float64(max), nil).Height(6)
+				frac := float32(0)
+				if max > 0 && r.bytes > 0 {
+					frac = float32(r.bytes) / float32(max)
+					if frac > 1 {
+						frac = 1
+					} else if frac < 0.02 {
+						frac = 0.02
+					}
+				}
+				bar := float32(132) * frac
+				ui.Column(rc).Width(132).Gap(4).Shrink(0).Children(func() {
+					ui.Row(rc).Height(4).Radius(2).Background(t.Border).Children(func() {
+						if bar > 0 {
+							ui.Box(rc).Width(bar).Height(4).Radius(2).Background(categoryColor(r.category)).Shrink(0)
+						}
+					})
 					label := formatBytes(r.bytes)
 					if !r.exists && r.bytes == 0 {
 						label = "missing"
 					}
-					ui.Text(rc, label).FontSize(12).TextAlign(ui.End)
+					ui.Text(rc, label).FontSize(12).FontFeatures("tnum").TextAlign(ui.End)
 				})
 				key, path, exists := r.key, r.path, r.exists
 				a.iconButton(rc, iconFolder, "Open location", "Show in folder", exists && path != "", func() {
@@ -613,7 +637,7 @@ func (a *app) listPane(c *ui.Context, t *ui.Theme) {
 
 func (a *app) iconButton(c *ui.Context, icon *ui.SVG, label, tip string, enabled bool, fn func()) {
 	ui.Button(c, "").Label(label).Tooltip(tip).Disabled(!enabled).Shrink(0).Padding(4).OnClick(fn).Children(func() {
-		ui.Icon(c, icon).FontSize(15)
+		ui.Icon(c, icon).FontSize(16)
 	})
 }
 
@@ -633,9 +657,9 @@ func (a *app) rowSub(r row) string {
 
 func (a *app) inspector(c *ui.Context, t *ui.Theme) {
 	r, ok := a.current()
-	ui.Column(c).Fill().Padding(12, 14).Gap(6).Children(func() {
+	ui.Column(c).Fill().Padding(12, 16).Gap(8).Children(func() {
 		if !ok {
-			ui.Text(c, "Select a row").TextColor(t.TextMuted)
+			ui.Text(c, "Choose a file to see where it lives, how it is laid out, and which tools use it.").TextColor(t.TextMuted).MaxLines(4)
 			return
 		}
 		nameEl := ui.Text(c, r.name).Bold().SingleLine()

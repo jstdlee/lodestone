@@ -117,6 +117,7 @@ func (a *app) finishScan(snap Snapshot) {
 		a.again = false
 		a.rescan()
 	}
+	a.maybeShots()
 }
 
 func mygoShellShow(path string) { mygo.Shell.ShowItemInFolder(path) }

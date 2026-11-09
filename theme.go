@@ -6,51 +6,52 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-// keroTheme is Kero's paper chrome: cool gray wash, white cards, blue accent.
-// Colors follow kero's lightPalette and darkPalette.
-func keroTheme(dark bool) *ui.Theme {
+// lodestoneTheme is Lodestone's mineral survey chrome: graphite surfaces,
+// hairlines, and a monochrome accent, so hue stays with the categories and
+// the blocks they mark.
+func lodestoneTheme(dark bool) *ui.Theme {
 	if dark {
 		t := ui.DarkTheme()
-		t.Background = ui.Hex("#141418")
-		t.Surface = ui.Hex("#232328")
-		t.SurfaceHover = ui.Hex("#2c2c32")
-		t.SurfacePressed = ui.Hex("#404047")
-		t.Border = ui.RGBA(255, 255, 255, 0.10)
-		t.Text = ui.Hex("#ececf0")
-		t.TextMuted = ui.Hex("#a9a9b4")
-		t.Accent = ui.Hex("#6b93ff")
-		t.AccentHover = ui.Hex("#8fb3ff")
-		t.AccentPressed = ui.Hex("#3b6cf6")
-		t.AccentText = ui.Hex("#161618")
-		t.Danger = ui.Hex("#ff6961")
-		t.Warning = ui.Hex("#f0a33a")
-		t.Success = ui.Hex("#4fd17a")
-		t.Selection = ui.RGBA(107, 147, 255, 0.35)
-		t.Focus = ui.RGBA(107, 147, 255, 0.55)
-		t.Scrollbar = ui.RGBA(255, 255, 255, 0.28)
+		t.Background = ui.Hex("#101011")
+		t.Surface = ui.Hex("#19191b")
+		t.SurfaceHover = ui.Hex("#232325")
+		t.SurfacePressed = ui.Hex("#2c2c2e")
+		t.Border = ui.RGBA(237, 237, 237, 0.09)
+		t.Text = ui.Hex("#ededed")
+		t.TextMuted = ui.Hex("#a1a1a6")
+		t.Accent = ui.Hex("#ededed")
+		t.AccentHover = ui.Hex("#ffffff")
+		t.AccentPressed = ui.Hex("#c8c8cc")
+		t.AccentText = ui.Hex("#171717")
+		t.Danger = ui.Hex("#e5484d")
+		t.Warning = ui.Hex("#e8a33d")
+		t.Success = ui.Hex("#4cc38a")
+		t.Selection = ui.RGBA(237, 237, 237, 0.12)
+		t.Focus = ui.RGBA(237, 237, 237, 0.45)
+		t.Scrollbar = ui.RGBA(237, 237, 237, 0.28)
 		t.Radius = 8
 		t.InactiveAccent = t.Accent
 		t.TooltipDelay = 400 * time.Millisecond
 		return t
 	}
 	t := ui.LightTheme()
-	t.Background = ui.Hex("#eceef4")
+	t.Background = ui.Hex("#f0f0f2")
 	t.Surface = ui.Hex("#ffffff")
-	t.SurfaceHover = ui.Hex("#f7f7f9")
-	t.SurfacePressed = ui.Hex("#eceef4")
-	t.Border = ui.RGBA(0, 0, 0, 0.08)
-	t.Text = ui.Hex("#1d1d1f")
-	t.TextMuted = ui.Hex("#6e6e78")
-	t.Accent = ui.Hex("#3b6cf6")
-	t.AccentHover = ui.Hex("#2f5bd8")
-	t.AccentPressed = ui.Hex("#2f5bd8")
+	t.SurfaceHover = ui.Hex("#f4f4f5")
+	t.SurfacePressed = ui.Hex("#e4e4e7")
+	t.Border = ui.RGBA(23, 23, 23, 0.09)
+	t.Text = ui.Hex("#171717")
+	t.TextMuted = ui.Hex("#737373")
+	t.Accent = ui.Hex("#26262b")
+	t.AccentHover = ui.Hex("#17171a")
+	t.AccentPressed = ui.Hex("#3f3f46")
 	t.AccentText = ui.Hex("#ffffff")
-	t.Danger = ui.Hex("#d93a35")
-	t.Warning = ui.Hex("#c27b0f")
-	t.Success = ui.Hex("#22863a")
-	t.Selection = ui.RGBA(59, 108, 246, 0.18)
-	t.Focus = ui.RGBA(59, 108, 246, 0.45)
-	t.Scrollbar = ui.RGBA(0, 0, 0, 0.28)
+	t.Danger = ui.Hex("#dc2626")
+	t.Warning = ui.Hex("#b45309")
+	t.Success = ui.Hex("#16a34a")
+	t.Selection = ui.RGBA(23, 23, 23, 0.08)
+	t.Focus = ui.RGBA(23, 23, 23, 0.35)
+	t.Scrollbar = ui.RGBA(23, 23, 23, 0.28)
 	t.Radius = 8
 	t.InactiveAccent = t.Accent
 	t.TooltipDelay = 400 * time.Millisecond

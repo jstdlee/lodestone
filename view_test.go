@@ -77,8 +77,14 @@ func TestOpenCopyAndFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 	tt.Type("nothing-here")
-	if !tt.HasText("No matches") || tt.HasText("publisher/model") {
+	if !tt.HasText("No files match") || tt.HasText("publisher/model") {
 		t.Fatalf("search: %q", tt.Texts())
+	}
+	if err := tt.Click("Show everything"); err != nil {
+		t.Fatal(err)
+	}
+	if tt.HasText("No files match") || !tt.HasText("publisher/model") {
+		t.Fatalf("show everything: %q", tt.Texts())
 	}
 }
 
